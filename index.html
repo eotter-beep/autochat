@@ -86,36 +86,38 @@
         async function streamResponse() {
             const selectedCharacter = characterSelect.value;
             const userPrompt = promptInput.value.trim() || "hi";
-
+        
             if (!selectedCharacter) {
                 alert("Select a character!");
                 return;
             }
-
-            responseDiv.innerHTML = ""; // clear previous response
-
+        
+            responseDiv.innerHTML = "";
+        
             try {
                 const response = await puter.ai.chat({
                     model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
-                    stream: true,
+                    stream: true, // leave true, but handle non-stream fallback
                     messages: [
                         { role: "system", content: characters[selectedCharacter] },
                         { role: "user", content: userPrompt }
                     ]
                 });
-
+        
                 // Check if streaming is supported
-                if (response[Symbol.asyncIterator]) {
+                if (response && typeof response[Symbol.asyncIterator] === "function") {
                     for await (const part of response) {
                         if (part?.text) responseDiv.innerHTML += part.text;
                     }
+                } else if (response?.text) {
+                    // fallback if response is a single object with .text
+                    responseDiv.innerHTML = response.text;
                 } else {
-                    // fallback for non-streaming
-                    const text = await response.text();
-                    responseDiv.innerHTML = text;
+                    console.error(response);
+                    responseDiv.innerHTML = "Unexpected API response format.";
                 }
-
-                promptInput.value = ""; // clear prompt after sending
+        
+                promptInput.value = "";
             } catch (err) {
                 console.error(err);
                 responseDiv.innerHTML = "Error generating response. Check console.";
