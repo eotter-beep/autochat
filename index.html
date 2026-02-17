@@ -74,7 +74,6 @@
             }
         }
 
-        // Initial population
         populateDropdown();
 
         // Filter on search
@@ -82,53 +81,48 @@
             populateDropdown(e.target.value);
         });
 
-        // Stream response
-        async function streamResponse() {
+        // Send chat (no streaming)
+        async function sendChat() {
             const selectedCharacter = characterSelect.value;
             const userPrompt = promptInput.value.trim() || "hi";
-        
+
             if (!selectedCharacter) {
                 alert("Select a character!");
                 return;
             }
-        
-            responseDiv.innerHTML = "";
-        
+
+            responseDiv.innerHTML = ""; // clear previous response
+
             try {
-                const response = await puter.ai.chat({
+                // Simple call, no streaming
+                const result = await puter.ai.chat({
                     model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
-                    stream: true, // leave true, but handle non-stream fallback
                     messages: [
                         { role: "system", content: characters[selectedCharacter] },
                         { role: "user", content: userPrompt }
                     ]
                 });
-        
-                // Check if streaming is supported
-                if (response && typeof response[Symbol.asyncIterator] === "function") {
-                    for await (const part of response) {
-                        if (part?.text) responseDiv.innerHTML += part.text;
-                    }
-                } else if (response?.text) {
-                    // fallback if response is a single object with .text
-                    responseDiv.innerHTML = response.text;
+
+                // Display the response text
+                if (result?.text) {
+                    responseDiv.innerHTML = result.text;
                 } else {
-                    console.error(response);
-                    responseDiv.innerHTML = "Unexpected API response format.";
+                    console.error(result);
+                    responseDiv.innerHTML = "Unexpected API response.";
                 }
-        
-                promptInput.value = "";
+
+                promptInput.value = ""; // clear input
             } catch (err) {
                 console.error(err);
                 responseDiv.innerHTML = "Error generating response. Check console.";
             }
         }
 
-        sendBtn.addEventListener('click', streamResponse);
+        sendBtn.addEventListener('click', sendChat);
 
-        // Optional: press Enter to send
+        // Press Enter to send
         promptInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') streamResponse();
+            if (e.key === 'Enter') sendChat();
         });
     </script>
 </body>
