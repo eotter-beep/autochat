@@ -26,7 +26,7 @@
     <!-- Prompt input -->
     <div>
         <input id="prompt" placeholder="Type your prompt here">
-        <button onclick="streamResponse()">Send</button>
+        <button id="sendBtn">Send</button>
     </div>
 
     <!-- Response area -->
@@ -43,35 +43,48 @@
 
         const characterSelect = document.getElementById('character');
         const searchInput = document.getElementById('search');
+        const sendBtn = document.getElementById('sendBtn');
 
         // Populate dropdown
         function populateDropdown(filter = '') {
             characterSelect.innerHTML = '';
             for (const [key, desc] of Object.entries(characters)) {
-                if (key.toLowerCase().includes(filter.toLowerCase()) || desc.toLowerCase().includes(filter.toLowerCase())) {
+                const label = `${key} (${desc.split('.')[0]})`;
+                if (
+                    key.toLowerCase().includes(filter.toLowerCase()) ||
+                    desc.toLowerCase().includes(filter.toLowerCase())
+                ) {
                     const option = document.createElement('option');
                     option.value = key;
-                    option.textContent = `${key} (${desc.split('.')[0]})`;
+                    option.textContent = label;
                     characterSelect.appendChild(option);
                 }
             }
+            // If there are options, select the first one so UI isn't empty
+            if (characterSelect.options.length > 0) {
+                characterSelect.selectedIndex = 0;
+            }
         }
 
+        // Initialize dropdown
         populateDropdown();
 
+        // Filter dropdown on search
         searchInput.addEventListener('input', (e) => {
             populateDropdown(e.target.value);
         });
 
+        // Stream response using Puter API
         async function streamResponse() {
             const outputDiv = document.getElementById('response');
-            outputDiv.innerHTML = "";
-        
+            outputDiv.innerHTML = ""; // clear previous response
+
             const userPrompt = document.getElementById('prompt').value || "hi";
             const selectedCharacter = characterSelect.value;
-        
+
             if (!selectedCharacter) return alert("Select a character!");
-        
+
+            // IMPORTANT: pass system as a string and include messages array
             const response = await puter.ai.chat({
                 model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
                 stream: true,
@@ -80,14 +93,6 @@
                     { role: "user", content: userPrompt }
                 ]
             });
-        
-            for await (const part of response) {
-                if (part?.text) {
-                    outputDiv.innerHTML += part.text;
-                }
-            }
-        }
-
 
             for await (const part of response) {
                 if (part?.text) {
@@ -95,6 +100,9 @@
                 }
             }
         }
+
+        // Wire button
+        sendBtn.addEventListener('click', streamResponse);
     </script>
 </body>
 </html>
