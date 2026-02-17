@@ -77,22 +77,33 @@
         // Stream response using Puter API
         async function streamResponse() {
             const outputDiv = document.getElementById('response');
-            outputDiv.innerHTML = ""; // clear previous response
-
+            outputDiv.innerHTML = "";
+        
             const userPrompt = document.getElementById('prompt').value || "hi";
             const selectedCharacter = characterSelect.value;
-
+        
             if (!selectedCharacter) return alert("Select a character!");
-
-            // IMPORTANT: pass system as a string and include messages array
-            const response = await puter.ai.chat({
-                model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
-                stream: true,
-                system: characters[selectedCharacter],
-                messages: [
-                    { role: "user", content: userPrompt }
-                ]
-            });
+        
+            try {
+                const response = await puter.ai.chat({
+                    model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
+                    stream: true,
+                    messages: [
+                        { role: "system", content: characters[selectedCharacter] },
+                        { role: "user", content: userPrompt }
+                    ]
+                });
+        
+                for await (const part of response) {
+                    if (part?.text) {
+                        outputDiv.innerHTML += part.text;
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                outputDiv.innerHTML = "Error generating response.";
+            }
+        }
 
             for await (const part of response) {
                 if (part?.text) {
