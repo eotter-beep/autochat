@@ -1,0 +1,55 @@
+<html>
+<body>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
+    <header>
+      <h1>Autochat</h1>
+      <nav>
+        <a href="submitting.html">Submit a character</a>
+      </nav>
+    </header>
+    <div>
+        <label for="character">Choose a character:</label>
+        <select id="character">
+            <option value="luna">Luna (sassy cat)</option>
+        </select>
+    </div>
+
+    <div>
+        <input id="prompt" placeholder="Type your prompt here">
+        <button onclick="streamResponse()">Send</button>
+    </div>
+
+    <div id="response" style="margin-top:1em; border:1px solid #ccc; padding:10px;"></div>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script>
+        // Define characters and their system prompts
+        const characters = {
+            "luna": "You are a sassy cat."
+        };
+
+        async function streamResponse() {
+            const outputDiv = document.getElementById('response');
+            outputDiv.innerHTML = ""; // clear previous response
+
+            const userPrompt = document.getElementById('prompt').value || "hi";
+            const selectedCharacter = document.getElementById('character').value;
+
+            const response = await puter.ai.chat(
+                userPrompt,
+                {
+                    model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
+                    stream: true,
+                    system: { [selectedCharacter]: characters[selectedCharacter] }
+                }
+            );
+
+            for await (const part of response) {
+                if (part?.text) {
+                    outputDiv.innerHTML += part.text;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
