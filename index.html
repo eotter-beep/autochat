@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <title>Autochat - GPT4All</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css" />
   <style>
-    /* small local styles to keep layout tidy */
-    body { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+    body { max-width:900px; margin:1.5rem auto; padding:0 1rem; }
     header { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }
     nav a { margin-left:0.5rem; }
     .controls { display:flex; gap:1rem; flex-wrap:wrap; align-items:center; margin-top:1rem; }
-    .controls > div { min-width: 220px; }
+    .controls > div { min-width:220px; }
     #response { margin-top:1em; border:1px solid #ccc; padding:10px; white-space: pre-wrap; min-height:4rem; }
     #sendBtn[disabled] { opacity:0.6; cursor:not-allowed; }
+    label { display:block; margin-bottom:0.25rem; }
   </style>
 </head>
 <body>
@@ -25,197 +25,224 @@
     </nav>
   </header>
 
-  <!-- Search box -->
-  <div style="margin-top:1rem;">
-    <label for="search">Search characters:</label>
-    <input id="search" placeholder="Type to filter characters" />
-  </div>
-
-  <!-- Character dropdown -->
-  <div style="margin-top:0.5rem;">
-    <label for="character">Choose a character:</label>
-    <select id="character" aria-label="Choose a character"></select>
-  </div>
-
-  <!-- Prompt input -->
-  <div class="controls" style="margin-top:0.5rem;">
-    <div style="flex:1; min-width:220px;">
-      <input id="prompt" placeholder="Type your prompt here" style="width:100%;" />
-    </div>
+  <section style="margin-top:1rem;">
     <div>
-      <button id="sendBtn" disabled>Send</button>
+      <label for="search">Search characters</label>
+      <input id="search" placeholder="Type to filter characters" />
     </div>
-  </div>
 
-  <!-- Response area -->
-  <div id="response" role="status" aria-live="polite">Initializing model…</div>
+    <div style="margin-top:0.5rem;">
+      <label for="character">Choose a character</label>
+      <select id="character" aria-label="Choose a character"></select>
+    </div>
 
-  <!-- GPT4All.js CDN -->
+    <div class="controls" style="margin-top:0.5rem;">
+      <div style="flex:1; min-width:220px;">
+        <label for="prompt" style="visibility:hidden; height:0; margin:0; padding:0;">Prompt</label>
+        <input id="prompt" placeholder="Type your prompt here" style="width:100%;" />
+      </div>
+      <div>
+        <button id="sendBtn" disabled>Send</button>
+      </div>
+    </div>
+
+    <div id="response" role="status" aria-live="polite">Initializing…</div>
+  </section>
+
   <script type="module">
-    import { GPT4All } from "https://cdn.jsdelivr.net/npm/gpt4all/dist/gpt4all.min.js";
-
-    // Character definitions
-    const characters = {
-      "luna": "You are a sassy cat.",
-      "zephyr": "You are a wise old owl who gives thoughtful advice.",
-      "nova": "You are a cheerful robot who loves to make people happy."
-    };
-
-    // DOM refs
-    const characterSelect = document.getElementById('character');
-    const searchInput = document.getElementById('search');
-    const sendBtn = document.getElementById('sendBtn');
-    const responseDiv = document.getElementById('response');
-    const promptInput = document.getElementById('prompt');
-
-    // Populate dropdown with optional filter
-    function populateDropdown(filter = '') {
-      const prevValue = characterSelect.value;
-      characterSelect.innerHTML = '';
-
-      const keys = Object.keys(characters);
-      const normalizedFilter = (filter || '').toLowerCase().trim();
-
-      const matches = keys.filter(k => {
-        const desc = characters[k] || '';
-        return k.toLowerCase().includes(normalizedFilter) || desc.toLowerCase().includes(normalizedFilter);
-      });
-
-      if (matches.length === 0) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.disabled = true;
-        option.selected = true;
-        option.textContent = 'No characters match';
-        characterSelect.appendChild(option);
-        return;
-      }
-
-      for (const key of matches) {
-        const desc = characters[key] || '';
-        const option = document.createElement('option');
-        option.value = key;
-        // show a short description (first sentence or whole string)
-        const shortDesc = desc.split('.').filter(Boolean)[0] || desc;
-        option.textContent = `${key} — ${shortDesc}`;
-        characterSelect.appendChild(option);
-      }
-
-      // restore previous selection if still available
-      if (prevValue && Array.from(characterSelect.options).some(o => o.value === prevValue)) {
-        characterSelect.value = prevValue;
-      } else {
-        characterSelect.selectedIndex = 0;
-      }
+    // Dynamic import helper to handle different CDN export shapes
+    async function importGPT4All(url) {
+      const mod = await import(url);
+      // Common shapes: named export, default export, default.GPT4All, or module itself
+      const candidate =
+        mod.GPT4All ||
+        (mod.default && mod.default.GPT4All) ||
+        mod.default ||
+        mod;
+      return candidate;
     }
 
-    populateDropdown();
+    (async () => {
+      // Character definitions
+      const characters = {
+        "luna": "You are a sassy cat.",
+        "zephyr": "You are a wise old owl who gives thoughtful advice.",
+        "nova": "You are a cheerful robot who loves to make people happy."
+      };
 
-    // filter as user types
-    searchInput.addEventListener('input', (e) => populateDropdown(e.target.value));
+      // DOM refs
+      const characterSelect = document.getElementById('character');
+      const searchInput = document.getElementById('search');
+      const sendBtn = document.getElementById('sendBtn');
+      const responseDiv = document.getElementById('response');
+      const promptInput = document.getElementById('prompt');
 
-    // Initialize GPT4All and enable UI when ready
-    let gpt = null;
-    let modelReady = false;
+      // Populate dropdown with optional filter
+      function populateDropdown(filter = '') {
+        const prevValue = characterSelect.value;
+        characterSelect.innerHTML = '';
 
-    async function initGPT() {
-      responseDiv.textContent = 'Initializing model… This may take a few seconds.';
-      sendBtn.disabled = true;
+        const keys = Object.keys(characters);
+        const normalizedFilter = (filter || '').toLowerCase().trim();
 
-      try {
-        // Create instance (model name kept as in original; adjust if your environment requires a different model)
-        gpt = new GPT4All({ model: "gpt4all-lora-quantized" });
-        await gpt.init();
-        modelReady = true;
-        responseDiv.textContent = 'Model ready. Choose a character and send a prompt.';
-        sendBtn.disabled = false;
-      } catch (err) {
-        console.error('Model initialization failed:', err);
-        responseDiv.textContent = 'Failed to initialize model. See console for details.';
-        sendBtn.disabled = true;
-      }
-    }
-
-    initGPT();
-
-    // Helper to safely set response text
-    function setResponseText(text) {
-      responseDiv.textContent = text;
-    }
-
-    // Send chat
-    async function sendChat() {
-      // prevent sending if model not ready
-      if (!modelReady || !gpt) {
-        alert('Model is not ready yet. Please wait a moment.');
-        return;
-      }
-
-      const selectedCharacter = characterSelect.value;
-      const userPrompt = (promptInput.value || '').trim();
-
-      if (!selectedCharacter) {
-        alert('Select a character!');
-        return;
-      }
-
-      if (!userPrompt) {
-        alert('Please enter a prompt.');
-        return;
-      }
-
-      // show immediate feedback
-      setResponseText('Thinking...');
-
-      try {
-        const systemPrompt = characters[selectedCharacter] || '';
-        const fullPrompt = `${systemPrompt}\nUser: ${userPrompt}\nAI:`;
-
-        // The GPT4All JS API may expose different methods depending on version.
-        // The original code used gpt.prompt; if your runtime exposes a different method (e.g., gpt.generate or gpt.chat),
-        // replace the call below accordingly. This code assumes a simple prompt->string API.
-        const output = await gpt.prompt(fullPrompt, {
-          max_tokens: 200,
-          temperature: 0.7
+        const matches = keys.filter(k => {
+          const desc = characters[k] || '';
+          return k.toLowerCase().includes(normalizedFilter) || desc.toLowerCase().includes(normalizedFilter);
         });
 
-        // Some runtimes return an object; handle common cases
-        let text = '';
-        if (typeof output === 'string') {
-          text = output;
-        } else if (output && typeof output === 'object') {
-          // try common fields
-          text = output.text || output.output || output.response || JSON.stringify(output);
-        } else {
-          text = String(output);
+        if (matches.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.disabled = true;
+          option.selected = true;
+          option.textContent = 'No characters match';
+          characterSelect.appendChild(option);
+          return;
         }
 
-        setResponseText(text.trim());
-        promptInput.value = '';
-      } catch (err) {
-        console.error('Generation error:', err);
-        setResponseText('Error generating response. See console for details.');
-      }
-    }
+        for (const key of matches) {
+          const desc = characters[key] || '';
+          const option = document.createElement('option');
+          option.value = key;
+          const shortDesc = desc.split('.').filter(Boolean)[0] || desc;
+          option.textContent = `${key} — ${shortDesc}`;
+          characterSelect.appendChild(option);
+        }
 
-    // Click handler
-    sendBtn.addEventListener('click', sendChat);
-
-    // Enter key handling: prevent default form submission and trigger send
-    promptInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        // only send if enabled
-        if (!sendBtn.disabled) sendChat();
+        if (prevValue && Array.from(characterSelect.options).some(o => o.value === prevValue)) {
+          characterSelect.value = prevValue;
+        } else {
+          characterSelect.selectedIndex = 0;
+        }
       }
-    });
 
-    // Accessibility: allow Enter on select to focus prompt
-    characterSelect.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        promptInput.focus();
+      populateDropdown();
+      searchInput.addEventListener('input', (e) => populateDropdown(e.target.value));
+
+      // Load GPT4All module and initialize model instance
+      let gpt = null;
+      let modelReady = false;
+
+      async function initModel() {
+        responseDiv.textContent = 'Initializing model… This may take a few seconds.';
+        sendBtn.disabled = true;
+
+        try {
+          const GPT4AllExport = await importGPT4All("https://cdn.jsdelivr.net/npm/gpt4all/dist/gpt4all.min.js");
+
+          // Instantiate depending on export shape
+          if (typeof GPT4AllExport === 'function') {
+            // Could be a constructor or factory
+            try {
+              gpt = new GPT4AllExport({ model: "gpt4all-lora-quantized" });
+            } catch (e) {
+              // not constructible, try as async factory
+              gpt = await GPT4AllExport({ model: "gpt4all-lora-quantized" });
+            }
+          } else if (GPT4AllExport && typeof GPT4AllExport.create === 'function') {
+            gpt = await GPT4AllExport.create({ model: "gpt4all-lora-quantized" });
+          } else {
+            // fallback: use the export as instance if it already looks like one
+            gpt = GPT4AllExport;
+          }
+
+          // Some builds require explicit init
+          if (gpt && typeof gpt.init === 'function') {
+            await gpt.init();
+          }
+
+          modelReady = true;
+          responseDiv.textContent = 'Model ready. Choose a character and send a prompt.';
+          sendBtn.disabled = false;
+        } catch (err) {
+          console.error('Model initialization failed:', err);
+          responseDiv.textContent = 'Failed to initialize model. See console for details.';
+          sendBtn.disabled = true;
+        }
       }
+
+      initModel();
+
+      // Safe response setter
+      function setResponseText(text) {
+        responseDiv.textContent = text;
+      }
+
+      // Send chat logic with robust handling of different API shapes
+      async function sendChat() {
+        if (!modelReady || !gpt) {
+          alert('Model is not ready yet. Please wait a moment.');
+          return;
+        }
+
+        const selectedCharacter = characterSelect.value;
+        const userPrompt = (promptInput.value || '').trim();
+
+        if (!selectedCharacter) {
+          alert('Select a character!');
+          return;
+        }
+
+        if (!userPrompt) {
+          alert('Please enter a prompt.');
+          return;
+        }
+
+        setResponseText('Thinking...');
+
+        try {
+          const systemPrompt = characters[selectedCharacter] || '';
+          const fullPrompt = `${systemPrompt}\nUser: ${userPrompt}\nAI:`;
+
+          // Try common generation methods
+          let output;
+          if (gpt && typeof gpt.prompt === 'function') {
+            output = await gpt.prompt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+          } else if (gpt && typeof gpt.generate === 'function') {
+            output = await gpt.generate(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+          } else if (gpt && typeof gpt.run === 'function') {
+            output = await gpt.run(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+          } else if (typeof gpt === 'function') {
+            // some factories return a function that accepts prompt
+            output = await gpt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+          } else {
+            throw new Error('No supported generation method found on model instance');
+          }
+
+          // Normalize output
+          let text = '';
+          if (typeof output === 'string') text = output;
+          else if (output && typeof output === 'object') text = output.text || output.output || output.response || JSON.stringify(output);
+          else text = String(output);
+
+          setResponseText(text.trim());
+          promptInput.value = '';
+        } catch (err) {
+          console.error('Generation error:', err);
+          setResponseText('Error generating response. See console for details.');
+        }
+      }
+
+      // Event handlers
+      sendBtn.addEventListener('click', sendChat);
+
+      promptInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (!sendBtn.disabled) sendChat();
+        }
+      });
+
+      characterSelect.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          promptInput.focus();
+        }
+      });
+    })().catch(err => {
+      console.error('Startup error:', err);
+      const responseDiv = document.getElementById('response');
+      if (responseDiv) responseDiv.textContent = 'Startup error. See console for details.';
     });
   </script>
 </body>
