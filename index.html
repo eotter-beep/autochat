@@ -50,199 +50,169 @@
   </section>
 
   <script type="module">
-    // Dynamic import helper to handle different CDN export shapes
-    async function importGPT4All(url) {
-      const mod = await import(url);
-      // Common shapes: named export, default export, default.GPT4All, or module itself
-      const candidate =
-        mod.GPT4All ||
-        (mod.default && mod.default.GPT4All) ||
-        mod.default ||
-        mod;
-      return candidate;
+    const GPT4AllModule = require("gpt4all");
+    
+    const characters = {
+      luna: "You are a sassy cat.",
+      zephyr: "You are a wise old owl who gives thoughtful advice.",
+      nova: "You are a cheerful robot who loves to make people happy."
+    };
+    
+    const characterSelect = document.getElementById("character");
+    const searchInput = document.getElementById("search");
+    const sendBtn = document.getElementById("sendBtn");
+    const responseDiv = document.getElementById("response");
+    const promptInput = document.getElementById("prompt");
+    
+    function populateDropdown(filter = "") {
+      const prevValue = characterSelect.value;
+      characterSelect.innerHTML = "";
+    
+      const keys = Object.keys(characters);
+      const normalizedFilter = (filter || "").toLowerCase().trim();
+    
+      const matches = keys.filter((k) => {
+        const desc = characters[k] || "";
+        return k.toLowerCase().includes(normalizedFilter) || desc.toLowerCase().includes(normalizedFilter);
+      });
+    
+      if (matches.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.disabled = true;
+        option.selected = true;
+        option.textContent = "No characters match";
+        characterSelect.appendChild(option);
+        return;
+      }
+    
+      for (const key of matches) {
+        const desc = characters[key] || "";
+        const option = document.createElement("option");
+        option.value = key;
+        const shortDesc = desc.split(".").filter(Boolean)[0] || desc;
+        option.textContent = `${key} — ${shortDesc}`;
+        characterSelect.appendChild(option);
+      }
+    
+      if (prevValue && Array.from(characterSelect.options).some((o) => o.value === prevValue)) {
+        characterSelect.value = prevValue;
+      } else {
+        characterSelect.selectedIndex = 0;
+      }
     }
-
-    (async () => {
-      // Character definitions
-      const characters = {
-        "luna": "You are a sassy cat.",
-        "zephyr": "You are a wise old owl who gives thoughtful advice.",
-        "nova": "You are a cheerful robot who loves to make people happy."
-      };
-
-      // DOM refs
-      const characterSelect = document.getElementById('character');
-      const searchInput = document.getElementById('search');
-      const sendBtn = document.getElementById('sendBtn');
-      const responseDiv = document.getElementById('response');
-      const promptInput = document.getElementById('prompt');
-
-      // Populate dropdown with optional filter
-      function populateDropdown(filter = '') {
-        const prevValue = characterSelect.value;
-        characterSelect.innerHTML = '';
-
-        const keys = Object.keys(characters);
-        const normalizedFilter = (filter || '').toLowerCase().trim();
-
-        const matches = keys.filter(k => {
-          const desc = characters[k] || '';
-          return k.toLowerCase().includes(normalizedFilter) || desc.toLowerCase().includes(normalizedFilter);
-        });
-
-        if (matches.length === 0) {
-          const option = document.createElement('option');
-          option.value = '';
-          option.disabled = true;
-          option.selected = true;
-          option.textContent = 'No characters match';
-          characterSelect.appendChild(option);
-          return;
-        }
-
-        for (const key of matches) {
-          const desc = characters[key] || '';
-          const option = document.createElement('option');
-          option.value = key;
-          const shortDesc = desc.split('.').filter(Boolean)[0] || desc;
-          option.textContent = `${key} — ${shortDesc}`;
-          characterSelect.appendChild(option);
-        }
-
-        if (prevValue && Array.from(characterSelect.options).some(o => o.value === prevValue)) {
-          characterSelect.value = prevValue;
+    
+    populateDropdown();
+    searchInput.addEventListener("input", (e) => populateDropdown(e.target.value));
+    
+    let gpt = null;
+    let modelReady = false;
+    
+    async function initModel() {
+      responseDiv.textContent = "Initializing model… This may take a few seconds.";
+      sendBtn.disabled = true;
+    
+      try {
+        const anyMod = GPT4AllModule;
+    
+        const GPT4AllCtor =
+          anyMod.GPT4All || anyMod.default?.GPT4All || anyMod.default || anyMod;
+    
+        if (typeof GPT4AllCtor === "function") {
+          try {
+            gpt = new GPT4AllCtor({ model: "gpt4all-lora-quantized" });
+          } catch (err) {
+            gpt = await GPT4AllCtor({ model: "gpt4all-lora-quantized" });
+          }
+        } else if (GPT4AllCtor && typeof GPT4AllCtor.create === "function") {
+          gpt = await GPT4AllCtor.create({ model: "gpt4all-lora-quantized" });
         } else {
-          characterSelect.selectedIndex = 0;
+          gpt = GPT4AllCtor;
         }
-      }
-
-      populateDropdown();
-      searchInput.addEventListener('input', (e) => populateDropdown(e.target.value));
-
-      // Load GPT4All module and initialize model instance
-      let gpt = null;
-      let modelReady = false;
-
-      async function initModel() {
-        responseDiv.textContent = 'Initializing model… This may take a few seconds.';
+    
+        if (gpt && typeof gpt.init === "function") {
+          await gpt.init();
+        }
+    
+        modelReady = true;
+        responseDiv.textContent = "Model ready. Choose a character and send a prompt.";
+        sendBtn.disabled = false;
+      } catch (err) {
+        console.error("Model initialization failed:", err);
+        responseDiv.textContent = "Failed to initialize model. See console for details.";
         sendBtn.disabled = true;
-
-        try {
-          const GPT4AllExport = await importGPT4All("https://cdn.jsdelivr.net/npm/gpt4all/dist/gpt4all.min.js");
-
-          // Instantiate depending on export shape
-          if (typeof GPT4AllExport === 'function') {
-            // Could be a constructor or factory
-            try {
-              gpt = new GPT4AllExport({ model: "gpt4all-lora-quantized" });
-            } catch (e) {
-              // not constructible, try as async factory
-              gpt = await GPT4AllExport({ model: "gpt4all-lora-quantized" });
-            }
-          } else if (GPT4AllExport && typeof GPT4AllExport.create === 'function') {
-            gpt = await GPT4AllExport.create({ model: "gpt4all-lora-quantized" });
-          } else {
-            // fallback: use the export as instance if it already looks like one
-            gpt = GPT4AllExport;
-          }
-
-          // Some builds require explicit init
-          if (gpt && typeof gpt.init === 'function') {
-            await gpt.init();
-          }
-
-          modelReady = true;
-          responseDiv.textContent = 'Model ready. Choose a character and send a prompt.';
-          sendBtn.disabled = false;
-        } catch (err) {
-          console.error('Model initialization failed:', err);
-          responseDiv.textContent = 'Failed to initialize model. See console for details.';
-          sendBtn.disabled = true;
-        }
       }
-
-      initModel();
-
-      // Safe response setter
-      function setResponseText(text) {
-        responseDiv.textContent = text;
+    }
+    
+    initModel();
+    
+    function setResponseText(text) {
+      responseDiv.textContent = text;
+    }
+    
+    async function sendChat() {
+      if (!modelReady || !gpt) {
+        alert("Model is not ready yet. Please wait a moment.");
+        return;
       }
-
-      // Send chat logic with robust handling of different API shapes
-      async function sendChat() {
-        if (!modelReady || !gpt) {
-          alert('Model is not ready yet. Please wait a moment.');
-          return;
-        }
-
-        const selectedCharacter = characterSelect.value;
-        const userPrompt = (promptInput.value || '').trim();
-
-        if (!selectedCharacter) {
-          alert('Select a character!');
-          return;
-        }
-
-        if (!userPrompt) {
-          alert('Please enter a prompt.');
-          return;
-        }
-
-        setResponseText('Thinking...');
-
-        try {
-          const systemPrompt = characters[selectedCharacter] || '';
-          const fullPrompt = `${systemPrompt}\nUser: ${userPrompt}\nAI:`;
-
-          // Try common generation methods
-          let output;
-          if (gpt && typeof gpt.prompt === 'function') {
-            output = await gpt.prompt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
-          } else if (gpt && typeof gpt.generate === 'function') {
-            output = await gpt.generate(fullPrompt, { max_tokens: 200, temperature: 0.7 });
-          } else if (gpt && typeof gpt.run === 'function') {
-            output = await gpt.run(fullPrompt, { max_tokens: 200, temperature: 0.7 });
-          } else if (typeof gpt === 'function') {
-            // some factories return a function that accepts prompt
-            output = await gpt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
-          } else {
-            throw new Error('No supported generation method found on model instance');
-          }
-
-          // Normalize output
-          let text = '';
-          if (typeof output === 'string') text = output;
-          else if (output && typeof output === 'object') text = output.text || output.output || output.response || JSON.stringify(output);
-          else text = String(output);
-
-          setResponseText(text.trim());
-          promptInput.value = '';
-        } catch (err) {
-          console.error('Generation error:', err);
-          setResponseText('Error generating response. See console for details.');
-        }
+    
+      const selectedCharacter = characterSelect.value;
+      const userPrompt = (promptInput.value || "").trim();
+    
+      if (!selectedCharacter) {
+        alert("Select a character!");
+        return;
       }
-
-      // Event handlers
-      sendBtn.addEventListener('click', sendChat);
-
-      promptInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          if (!sendBtn.disabled) sendChat();
+    
+      if (!userPrompt) {
+        alert("Please enter a prompt.");
+        return;
+      }
+    
+      setResponseText("Thinking...");
+    
+      try {
+        const systemPrompt = characters[selectedCharacter] || "";
+        const fullPrompt = `${systemPrompt}\nUser: ${userPrompt}\nAI:`;
+    
+        let output;
+        if (typeof gpt.prompt === "function") {
+          output = await gpt.prompt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+        } else if (typeof gpt.generate === "function") {
+          output = await gpt.generate(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+        } else if (typeof gpt.run === "function") {
+          output = await gpt.run(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+        } else if (typeof gpt === "function") {
+          output = await gpt(fullPrompt, { max_tokens: 200, temperature: 0.7 });
+        } else {
+          throw new Error("No supported generation method found on model instance");
         }
-      });
-
-      characterSelect.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          promptInput.focus();
-        }
-      });
-    })().catch(err => {
-      console.error('Startup error:', err);
-      const responseDiv = document.getElementById('response');
-      if (responseDiv) responseDiv.textContent = 'Startup error. See console for details.';
+    
+        let text = "";
+        if (typeof output === "string") text = output;
+        else if (output && typeof output === "object") text = output.text || output.output || output.response || JSON.stringify(output);
+        else text = String(output);
+    
+        setResponseText(text.trim());
+        promptInput.value = "";
+      } catch (err) {
+        console.error("Generation error:", err);
+        setResponseText("Error generating response. See console for details.");
+      }
+    }
+    
+    sendBtn.addEventListener("click", sendChat);
+    promptInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!sendBtn.disabled) sendChat();
+      }
+    });
+    characterSelect.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        promptInput.focus();
+      }
     });
   </script>
 </body>
