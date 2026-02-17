@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html>
-<body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Autochat</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
-
+</head>
+<body>
     <header>
-      <h1>Autochat</h1>
-      <nav>
-        <a href="submitting.html">Submit a character</a>
-        <a href="https://github.com/eotter-beep/autochat/issues/new">Bug report</a>
-      </nav>
+        <h1>Autochat</h1>
+        <nav>
+            <a href="submitting.html">Submit a character</a>
+            <a href="https://github.com/eotter-beep/autochat/issues/new">Bug report</a>
+        </nav>
     </header>
 
     <!-- Search box -->
@@ -34,7 +37,6 @@
 
     <script src="https://js.puter.com/v2/"></script>
     <script>
-        // Define characters and their system prompts
         const characters = {
             "luna": "You are a sassy cat.",
             "zephyr": "You are a wise old owl who gives thoughtful advice.",
@@ -44,46 +46,54 @@
         const characterSelect = document.getElementById('character');
         const searchInput = document.getElementById('search');
         const sendBtn = document.getElementById('sendBtn');
+        const responseDiv = document.getElementById('response');
+        const promptInput = document.getElementById('prompt');
 
-        // Populate dropdown
+        // Populate dropdown and preserve selection
         function populateDropdown(filter = '') {
+            const currentValue = characterSelect.value;
             characterSelect.innerHTML = '';
+
             for (const [key, desc] of Object.entries(characters)) {
-                const label = `${key} (${desc.split('.')[0]})`;
                 if (
                     key.toLowerCase().includes(filter.toLowerCase()) ||
                     desc.toLowerCase().includes(filter.toLowerCase())
                 ) {
                     const option = document.createElement('option');
                     option.value = key;
-                    option.textContent = label;
+                    option.textContent = `${key} (${desc.split('.')[0]})`;
                     characterSelect.appendChild(option);
                 }
             }
-            // If there are options, select the first one so UI isn't empty
-            if (characterSelect.options.length > 0) {
+
+            // Restore previous selection if possible
+            if (Array.from(characterSelect.options).some(opt => opt.value === currentValue)) {
+                characterSelect.value = currentValue;
+            } else if (characterSelect.options.length > 0) {
                 characterSelect.selectedIndex = 0;
             }
         }
 
-        // Initialize dropdown
+        // Initial population
         populateDropdown();
 
-        // Filter dropdown on search
+        // Filter on search
         searchInput.addEventListener('input', (e) => {
             populateDropdown(e.target.value);
         });
 
-        // Stream response using Puter API
+        // Stream response
         async function streamResponse() {
-            const outputDiv = document.getElementById('response');
-            outputDiv.innerHTML = "";
-        
-            const userPrompt = document.getElementById('prompt').value || "hi";
             const selectedCharacter = characterSelect.value;
-        
-            if (!selectedCharacter) return alert("Select a character!");
-        
+            const userPrompt = promptInput.value.trim() || "hi";
+
+            if (!selectedCharacter) {
+                alert("Select a character!");
+                return;
+            }
+
+            responseDiv.innerHTML = ""; // clear previous response
+
             try {
                 const response = await puter.ai.chat({
                     model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
@@ -93,27 +103,31 @@
                         { role: "user", content: userPrompt }
                     ]
                 });
-        
-                for await (const part of response) {
-                    if (part?.text) {
-                        outputDiv.innerHTML += part.text;
+
+                // Check if streaming is supported
+                if (response[Symbol.asyncIterator]) {
+                    for await (const part of response) {
+                        if (part?.text) responseDiv.innerHTML += part.text;
                     }
+                } else {
+                    // fallback for non-streaming
+                    const text = await response.text();
+                    responseDiv.innerHTML = text;
                 }
+
+                promptInput.value = ""; // clear prompt after sending
             } catch (err) {
                 console.error(err);
-                outputDiv.innerHTML = "Error generating response.";
+                responseDiv.innerHTML = "Error generating response. Check console.";
             }
         }
 
-            for await (const part of response) {
-                if (part?.text) {
-                    outputDiv.innerHTML += part.text;
-                }
-            }
-        }
-
-        // Wire button
         sendBtn.addEventListener('click', streamResponse);
+
+        // Optional: press Enter to send
+        promptInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') streamResponse();
+        });
     </script>
 </body>
 </html>
