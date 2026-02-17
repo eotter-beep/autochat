@@ -66,20 +66,28 @@
         async function streamResponse() {
             const outputDiv = document.getElementById('response');
             outputDiv.innerHTML = "";
-
+        
             const userPrompt = document.getElementById('prompt').value || "hi";
             const selectedCharacter = characterSelect.value;
-
+        
             if (!selectedCharacter) return alert("Select a character!");
-
-            const response = await puter.ai.chat(
-                userPrompt,
-                {
-                    model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
-                    stream: true,
-                    system: characters[selectedCharacter]   // <-- FIXED
+        
+            const response = await puter.ai.chat({
+                model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
+                stream: true,
+                system: characters[selectedCharacter],
+                messages: [
+                    { role: "user", content: userPrompt }
+                ]
+            });
+        
+            for await (const part of response) {
+                if (part?.text) {
+                    outputDiv.innerHTML += part.text;
                 }
-            );
+            }
+        }
+
 
             for await (const part of response) {
                 if (part?.text) {
