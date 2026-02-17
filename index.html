@@ -2,12 +2,22 @@
 <html>
 <body>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
+
     <header>
       <h1>Autochat</h1>
       <nav>
         <a href="submitting.html">Submit a character</a>
+        <a href="https://github.com/eotter-beep/autochat/issues/new">Bug report</a>
       </nav>
     </header>
+
+    <!-- Search box -->
+    <div>
+        <label for="search">Search characters:</label>
+        <input id="search" placeholder="Type to filter characters">
+    </div>
+
+    <!-- Character dropdown -->
     <div>
         <label for="character">Choose a character:</label>
         <select id="character">
@@ -15,26 +25,56 @@
         </select>
     </div>
 
+    <!-- Prompt input -->
     <div>
         <input id="prompt" placeholder="Type your prompt here">
         <button onclick="streamResponse()">Send</button>
     </div>
 
+    <!-- Response area -->
     <div id="response" style="margin-top:1em; border:1px solid #ccc; padding:10px;"></div>
 
     <script src="https://js.puter.com/v2/"></script>
     <script>
         // Define characters and their system prompts
         const characters = {
-            "luna": "You are a sassy cat."
+            "luna": "You are a sassy cat.",
+            "zephyr": "You are a wise old owl who gives thoughtful advice.",
+            "nova": "You are a cheerful robot who loves to make people happy."
         };
+
+        const characterSelect = document.getElementById('character');
+        const searchInput = document.getElementById('search');
+
+        // Populate dropdown
+        function populateDropdown(filter = '') {
+            characterSelect.innerHTML = '';
+            for (const [key, desc] of Object.entries(characters)) {
+                if (key.toLowerCase().includes(filter.toLowerCase()) || desc.toLowerCase().includes(filter.toLowerCase())) {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = `${key} (${desc.split('.')[0]})`;
+                    characterSelect.appendChild(option);
+                }
+            }
+        }
+
+        // Initialize dropdown
+        populateDropdown();
+
+        // Filter dropdown on search
+        searchInput.addEventListener('input', (e) => {
+            populateDropdown(e.target.value);
+        });
 
         async function streamResponse() {
             const outputDiv = document.getElementById('response');
             outputDiv.innerHTML = ""; // clear previous response
 
             const userPrompt = document.getElementById('prompt').value || "hi";
-            const selectedCharacter = document.getElementById('character').value;
+            const selectedCharacter = characterSelect.value;
+
+            if (!selectedCharacter) return alert("Select a character!");
 
             const response = await puter.ai.chat(
                 userPrompt,
@@ -54,3 +94,4 @@
     </script>
 </body>
 </html>
+
