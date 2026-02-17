@@ -20,9 +20,7 @@
     <!-- Character dropdown -->
     <div>
         <label for="character">Choose a character:</label>
-        <select id="character">
-            <option value="luna">Luna (sassy cat)</option>
-        </select>
+        <select id="character"></select>
     </div>
 
     <!-- Prompt input -->
@@ -59,17 +57,15 @@
             }
         }
 
-        // Initialize dropdown
         populateDropdown();
 
-        // Filter dropdown on search
         searchInput.addEventListener('input', (e) => {
             populateDropdown(e.target.value);
         });
 
         async function streamResponse() {
             const outputDiv = document.getElementById('response');
-            outputDiv.innerHTML = ""; // clear previous response
+            outputDiv.innerHTML = "";
 
             const userPrompt = document.getElementById('prompt').value || "hi";
             const selectedCharacter = characterSelect.value;
@@ -81,7 +77,7 @@
                 {
                     model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
                     stream: true,
-                    system: { [selectedCharacter]: characters[selectedCharacter] }
+                    system: characters[selectedCharacter]   // <-- FIXED
                 }
             );
 
@@ -94,4 +90,3 @@
     </script>
 </body>
 </html>
-
