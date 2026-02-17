@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Autochat</title>
+    <title>Autochat - GPT4All</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
 </head>
 <body>
@@ -33,10 +33,12 @@
     </div>
 
     <!-- Response area -->
-    <div id="response" style="margin-top:1em; border:1px solid #ccc; padding:10px;"></div>
+    <div id="response" style="margin-top:1em; border:1px solid #ccc; padding:10px; white-space: pre-wrap;"></div>
 
-    <script src="https://js.puter.com/v2/"></script>
-    <script>
+    <!-- GPT4All.js CDN -->
+    <script type="module">
+        import { GPT4All } from "https://cdn.jsdelivr.net/npm/gpt4all/dist/gpt4all.min.js";
+
         const characters = {
             "luna": "You are a sassy cat.",
             "zephyr": "You are a wise old owl who gives thoughtful advice.",
@@ -49,24 +51,18 @@
         const responseDiv = document.getElementById('response');
         const promptInput = document.getElementById('prompt');
 
-        // Populate dropdown and preserve selection
+        // Populate dropdown
         function populateDropdown(filter = '') {
             const currentValue = characterSelect.value;
             characterSelect.innerHTML = '';
-
             for (const [key, desc] of Object.entries(characters)) {
-                if (
-                    key.toLowerCase().includes(filter.toLowerCase()) ||
-                    desc.toLowerCase().includes(filter.toLowerCase())
-                ) {
+                if (key.toLowerCase().includes(filter.toLowerCase()) || desc.toLowerCase().includes(filter.toLowerCase())) {
                     const option = document.createElement('option');
                     option.value = key;
                     option.textContent = `${key} (${desc.split('.')[0]})`;
                     characterSelect.appendChild(option);
                 }
             }
-
-            // Restore previous selection if possible
             if (Array.from(characterSelect.options).some(opt => opt.value === currentValue)) {
                 characterSelect.value = currentValue;
             } else if (characterSelect.options.length > 0) {
@@ -75,13 +71,18 @@
         }
 
         populateDropdown();
+        searchInput.addEventListener('input', (e) => populateDropdown(e.target.value));
 
-        // Filter on search
-        searchInput.addEventListener('input', (e) => {
-            populateDropdown(e.target.value);
-        });
+        // Initialize GPT4All
+        let gpt;
+        async function initGPT() {
+            gpt = new GPT4All({ model: "gpt4all-lora-quantized" }); // CPU-friendly model
+            await gpt.init();
+            console.log("GPT4All initialized!");
+        }
+        initGPT();
 
-        // Send chat (no streaming)
+        // Send chat
         async function sendChat() {
             const selectedCharacter = characterSelect.value;
             const userPrompt = promptInput.value.trim() || "hi";
@@ -91,39 +92,27 @@
                 return;
             }
 
-            responseDiv.innerHTML = ""; // clear previous response
+            responseDiv.innerHTML = "Thinking...";
 
             try {
-                // Simple call, no streaming
-                const result = await puter.ai.chat({
-                    model: 'openrouter:meta-llama/llama-3.1-8b-instruct',
-                    messages: [
-                        { role: "system", content: characters[selectedCharacter] },
-                        { role: "user", content: userPrompt }
-                    ]
+                const systemPrompt = characters[selectedCharacter];
+                const fullPrompt = `${systemPrompt}\nUser: ${userPrompt}\nAI:`;
+
+                const output = await gpt.prompt(fullPrompt, {
+                    max_tokens: 200,
+                    temperature: 0.7
                 });
 
-                // Display the response text
-                if (result?.text) {
-                    responseDiv.innerHTML = result.text;
-                } else {
-                    console.error(result);
-                    responseDiv.innerHTML = "Unexpected API response.";
-                }
-
-                promptInput.value = ""; // clear input
+                responseDiv.innerHTML = output.trim();
+                promptInput.value = "";
             } catch (err) {
                 console.error(err);
-                responseDiv.innerHTML = "Error generating response. Check console.";
+                responseDiv.innerHTML = "Error generating response.";
             }
         }
 
         sendBtn.addEventListener('click', sendChat);
-
-        // Press Enter to send
-        promptInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendChat();
-        });
+        promptInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
     </script>
 </body>
 </html>
